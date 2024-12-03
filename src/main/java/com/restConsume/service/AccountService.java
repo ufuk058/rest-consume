@@ -8,4 +8,6 @@ public interface AccountService {
 
     List<AccountDTO> findAllByUsername(String username);
     AccountDTO create(AccountDTO accountDTO);
+
+    List<AccountDTO> findAll();
 }

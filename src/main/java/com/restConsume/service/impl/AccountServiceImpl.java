@@ -54,4 +54,10 @@ public class AccountServiceImpl implements AccountService {
         return accountToReturn;
 
     }
+
+    @Override
+    public List<AccountDTO> findAll() {
+        List<Account> accountList= accountRepository.findAll();
+        return accountList.stream().map(account -> mapperUtil.convert(account, new AccountDTO())).collect(Collectors.toList());
+    }
 }
