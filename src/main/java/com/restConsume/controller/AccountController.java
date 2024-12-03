@@ -1,12 +1,12 @@
 package com.restConsume.controller;
 
 import com.restConsume.dto.AccountDTO;
+import com.restConsume.dto.ResponseWrapper;
 import com.restConsume.dto.UserDTO;
 import com.restConsume.service.AccountService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -20,13 +20,35 @@ public class AccountController {
     }
 
     @GetMapping("/all")
-    public List<AccountDTO> getAllAccounts(){
-        return accountService.findAll();
+    public ResponseEntity<ResponseWrapper> getAllAccounts(){
+
+        return ResponseEntity.ok(ResponseWrapper.builder()
+                .success(true)
+                .message("All accounts retrieved successfully")
+                .code(HttpStatus.OK.value())
+                .data(accountService.findAll()).build());
     }
 
-    @GetMapping("/all/{username}")
-    public List<AccountDTO> getUserAllAccount(@PathVariable String username){
 
-        return accountService.findAllByUsername(username);
+
+    @GetMapping("/all/{username}")
+    public ResponseEntity<ResponseWrapper> getUserAllAccount(@PathVariable String username){
+
+        return ResponseEntity.ok(ResponseWrapper.builder()
+                        .success(true)
+                        .message("User: "+username+" retrieved successfully")
+                        .code(HttpStatus.OK.value())
+                        .data(accountService.findAllByUsername(username)).build());
+    }
+
+    @PostMapping("/create")
+    public ResponseEntity<ResponseWrapper> createAccount(@RequestBody AccountDTO accountDTO ){
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ResponseWrapper.builder()
+                        .success(true)
+                        .code(HttpStatus.CREATED.value())
+                        .message("Account successfully created")
+                        .data(accountService.create(accountDTO)).build());
     }
 }
