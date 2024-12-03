@@ -1,0 +1,137 @@
+
+Consuming Api With Feign Client
+
+1.Make sure you have feign client dependency
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-openfeign</artifactId>
+		</dependency>
+
+		<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+
+2-Adding @EnableFeignClients annotation to the runner class
+	@EnableFeignClients
+	public class RestConsumeApplication {
+
+		public static void main(String[] args) {
+			SpringApplication.run(RestConsumeApplication.class, args);
+		}
+
+		@Bean
+		public ModelMapper mapper(){
+			return new ModelMapper();
+	}
+
+
+3- Creating Client package and ad interface to consume the APIs.
+		@FeignClient(url ="http://www.cydeodev.com",name = "currency-service")
+		public interface CurrencyApiClient {
+
+    		@GetMapping("/api/v1/currency/all")
+    		AllCurrencyResponse getAllCurrencies();
+		}
+
+4-Creating POJO classes to accept Response Json Body;
+
+  CurrencyResponse:
+
+	@Data
+	@AllArgsConstructor
+	@NoArgsConstructor
+	public class CurrencyResponse {
+
+   	 	private String currencyName;
+    	private String currencyCode;
+    	private String currencySymbol;
+    	private BigDecimal gbpExchangeRate;
+	}
+
+
+
+  AllCurrencyResponse:
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public class AllCurrencyResponse {
+
+    	private LocalDateTime dateTime;
+    	private boolean success;
+    	private String httpStatus;
+    	private String message;
+    	private List<CurrencyResponse> data;
+}
+
+
+6- Add the otherCurrencies to the AccountDTO class
+	@JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Map<String, BigDecimal> otherCurrencies;
+
+
+7- Now check where you are going to calculate currency rates based on you Cotroller class
+ 	Controller : @GetMapping("/all/{username}")
+    			 public ResponseEntity<ResponseWrapper> getUserAllAccount(@PathVariable String username){
+
+        		 return ResponseEntity.ok(ResponseWrapper.builder()
+                        .success(true)
+                        .message("User: "+username+" retrieved successfully")
+                        .code(HttpStatus.OK.value())
+                        .data(accountService.findAllByUsername(username)).build());
+
+                     // findAllByUsername --> method that we need to return currecny exchange for the accounts
+    			 }
+
+
+	AccountService:
+
+	@Override
+    	public List<AccountDTO> findAllByUsername(String username) {
+        	return accountRepository.findAllByUser_Username(username).stream()
+               	 .map(account -> {
+                   	 AccountDTO accountDTO= mapperUtil.convert(account,new AccountDTO());
+                   	 accountDTO.setUsername(username);
+                    accountDTO.setOtherCurrencies(getAllCurrenciesByBalance(accountDTO.getBalance()));
+                    return accountDTO;
+                }).collect(Collectors.toList());
+    	}
+
+
+
+
+7- Create a getAllCurrenciesByBalance(accountDTO.getBalance()); method to calculate currencies
+	 	private Map<String, BigDecimal> getAllCurrenciesByBalance(BigDecimal balance){
+    	    /// We need to send  request to consume API to get currency exchange rates
+     	   AllCurrencyResponse allCurrencies= client.getAllCurrencies();
+     	   List<CurrencyResponse> currencyResponseList=allCurrencies.getData();
+     	   /// creating empty map to return
+    	    Map<String, BigDecimal> otherCurrencies= new HashMap<>();
+
+    	    /// calculate new balance for each currency code and assign balance values
+     	   currencyResponseList.forEach(eachCurrency ->{
+    	        BigDecimal currencyBalance = balance.multiply(eachCurrency.getGbpExchangeRate()).setScale(2, RoundingMode.HALF_UP);
+
+     	       otherCurrencies.put(eachCurrency.getCurrencyCode(), currencyBalance);
+    	    });
+
+    	   /// return otherCurrencies
+    	   return otherCurrencies;
+   		 }
+
+
+
+
+
+
+
+
+

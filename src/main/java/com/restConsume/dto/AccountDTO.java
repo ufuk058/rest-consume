@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 @Data
 @NoArgsConstructor
@@ -25,4 +26,6 @@ public class AccountDTO {
     private String baseCurrency;
     private BigDecimal balance;
     private String username;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Map<String, BigDecimal> otherCurrencies;
 }

@@ -1,7 +1,10 @@
 package com.restConsume.service.impl;
 
+import com.restConsume.client.CurrencyApiClient;
 import com.restConsume.dto.AccountDTO;
 import com.restConsume.dto.UserDTO;
+import com.restConsume.dto.response.AllCurrencyResponse;
+import com.restConsume.dto.response.CurrencyResponse;
 import com.restConsume.entity.Account;
 import com.restConsume.entity.User;
 import com.restConsume.repository.AccountRepository;
@@ -11,7 +14,11 @@ import com.restConsume.service.UserService;
 import com.restConsume.util.MapperUtil;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -20,11 +27,13 @@ public class AccountServiceImpl implements AccountService {
     private final AccountRepository accountRepository;
     private final UserService userService;
     private final MapperUtil mapperUtil;
+    private final CurrencyApiClient client;
 
-    public AccountServiceImpl(AccountRepository accountRepository, UserService userService, MapperUtil mapperUtil) {
+    public AccountServiceImpl(AccountRepository accountRepository, UserService userService, MapperUtil mapperUtil, CurrencyApiClient client) {
         this.accountRepository = accountRepository;
         this.userService = userService;
         this.mapperUtil = mapperUtil;
+        this.client = client;
     }
 
     @Override
@@ -33,8 +42,30 @@ public class AccountServiceImpl implements AccountService {
                 .map(account -> {
                     AccountDTO accountDTO= mapperUtil.convert(account,new AccountDTO());
                     accountDTO.setUsername(username);
+//                    Map<String, BigDecimal> otherCurrencies=new HashMap<>();
+//                    otherCurrencies.put("EUR",new BigDecimal(3000));
+//
+                    accountDTO.setOtherCurrencies(getAllCurrenciesByBalance(accountDTO.getBalance()));
                     return accountDTO;
                 }).collect(Collectors.toList());
+    }
+
+    private Map<String, BigDecimal> getAllCurrenciesByBalance(BigDecimal balance){
+        /// We need to send  request to consume API to get currency exchange rates
+        AllCurrencyResponse allCurrencies= client.getAllCurrencies();
+        List<CurrencyResponse> currencyResponseList=allCurrencies.getData();
+        /// creating empty map to return
+        Map<String, BigDecimal> otherCurrencies= new HashMap<>();
+
+        /// calculate new balance for each currency code and assign balance values
+        currencyResponseList.forEach(eachCurrency ->{
+            BigDecimal currencyBalance = balance.multiply(eachCurrency.getGbpExchangeRate()).setScale(2, RoundingMode.HALF_UP);
+
+            otherCurrencies.put(eachCurrency.getCurrencyCode(), currencyBalance);
+        });
+
+       /// return otherCurrencies
+       return otherCurrencies;
     }
 
     private Long generateAccountNumber(){
