@@ -12,7 +12,11 @@ import com.restConsume.repository.UserRepository;
 import com.restConsume.service.AccountService;
 import com.restConsume.service.UserService;
 import com.restConsume.util.MapperUtil;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -24,6 +28,8 @@ import java.util.stream.Collectors;
 @Service
 public class AccountServiceImpl implements AccountService {
 
+    @Value("${app.id}")
+    private String appId;
     private final AccountRepository accountRepository;
     private final UserService userService;
     private final MapperUtil mapperUtil;
@@ -42,9 +48,6 @@ public class AccountServiceImpl implements AccountService {
                 .map(account -> {
                     AccountDTO accountDTO= mapperUtil.convert(account,new AccountDTO());
                     accountDTO.setUsername(username);
-//                    Map<String, BigDecimal> otherCurrencies=new HashMap<>();
-//                    otherCurrencies.put("EUR",new BigDecimal(3000));
-//
                     accountDTO.setOtherCurrencies(getAllCurrenciesByBalance(accountDTO.getBalance()));
                     return accountDTO;
                 }).collect(Collectors.toList());
@@ -91,4 +94,52 @@ public class AccountServiceImpl implements AccountService {
         List<Account> accountList= accountRepository.findAll();
         return accountList.stream().map(account -> mapperUtil.convert(account, new AccountDTO())).collect(Collectors.toList());
     }
+
+    @Override
+    public List<AccountDTO> findAllByUsernameAndCurrencyList(String username, List<String> currencyList) {
+        return accountRepository.findAllByUser_Username(username).stream()
+                .map(account -> {
+                    AccountDTO accountDTO= mapperUtil.convert(account,new AccountDTO());
+                    accountDTO.setUsername(username);
+                    accountDTO.setOtherCurrencies(getListOfCurrenciesByBalanceSecure(accountDTO.getBalance(),currencyList));
+                    return accountDTO;
+                }).collect(Collectors.toList());
+    }
+
+    private Map<String, BigDecimal> getListOfCurrenciesByBalance(BigDecimal balance, List<String> currencyList){
+        /// We need to send  request to consume API to get currency exchange rates
+        AllCurrencyResponse allCurrencies= client.getListOfCurrencies(currencyList);
+        List<CurrencyResponse> currencyResponseList=allCurrencies.getData();
+        /// creating empty map to return
+        Map<String, BigDecimal> otherCurrencies= new HashMap<>();
+
+        /// calculate new balance for each currency code and assign balance values
+        currencyResponseList.forEach(eachCurrency ->{
+            BigDecimal currencyBalance = balance.multiply(eachCurrency.getGbpExchangeRate()).setScale(2, RoundingMode.HALF_UP);
+
+            otherCurrencies.put(eachCurrency.getCurrencyCode(), currencyBalance);
+        });
+
+        /// return otherCurrencies
+        return otherCurrencies;
+    }
+
+    private Map<String, BigDecimal> getListOfCurrenciesByBalanceSecure(BigDecimal balance, List<String> currencyList){
+        /// We need to send  request to consume API to get currency exchange rates
+        AllCurrencyResponse allCurrencies= client.getListOfCurrenciesSecure(currencyList,appId);
+        List<CurrencyResponse> currencyResponseList=allCurrencies.getData();
+        /// creating empty map to return
+        Map<String, BigDecimal> otherCurrencies= new HashMap<>();
+
+        /// calculate new balance for each currency code and assign balance values
+        currencyResponseList.forEach(eachCurrency ->{
+            BigDecimal currencyBalance = balance.multiply(eachCurrency.getGbpExchangeRate()).setScale(2, RoundingMode.HALF_UP);
+
+            otherCurrencies.put(eachCurrency.getCurrencyCode(), currencyBalance);
+        });
+
+        /// return otherCurrencies
+        return otherCurrencies;
+    }
+
 }

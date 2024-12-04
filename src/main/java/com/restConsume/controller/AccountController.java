@@ -51,4 +51,18 @@ public class AccountController {
                         .message("Account successfully created")
                         .data(accountService.create(accountDTO)).build());
     }
+
+    //  /api/v1/account
+    //  /all/currencies/{username} ?currencies=EUR, HUF, JPY
+    @GetMapping("all/currencies/{username}")
+    public ResponseEntity<ResponseWrapper> getAllAccountsByUsernameAndCurrencies(@PathVariable("username") String username,
+                                                                                 @RequestParam(name="currencyList") List<String> currencyList){
+
+        return ResponseEntity.ok(ResponseWrapper.builder()
+                .success(true)
+                .message("Account is successfully retrieved with the required currencies")
+                .code(HttpStatus.OK.value())
+                .data(accountService.findAllByUsernameAndCurrencyList(username,currencyList)).build());
+
+    }
 }
